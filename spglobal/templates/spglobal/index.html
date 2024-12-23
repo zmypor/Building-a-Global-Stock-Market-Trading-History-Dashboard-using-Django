@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Indices</title>
+    https://d3js.org/d3.v6.min.js
+
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #343a40;
+            color: #ffffff;
+        }
+        h1 {
+            color: #ffffff;
+            text-align: center;
+            margin-top: 20px;
+        }
+        #treemap {
+            margin: 0 auto;
+        }
+        .node {
+            border: solid 1px white;
+            font: 10px sans-serif;
+            line-height: 12px;
+            overflow: hidden;
+            position: absolute;
+            text-align: center;
+        }
+        a {
+            text-decoration: underline;
+            color: #ffffff;
+        }
+        a:hover {
+            color: #d3d3d3;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container mt-5">
+        <h1>Market Indices</h1>
+        <div id="treemap"></div>
+    </div>
+
+    <script>
+        const data = {
+            "name": "Indices",
+            "children": [
+                {% for index in indices %}
+                {
+                    "index_id": "{{ index.index_id }}",
+                    "code": "{{ index.code }}",
+                    "name": "{{ index.name }}",
+                    "constituents": {{ index.constituents }}
+                },
+                {% endfor %}
+            ]
+        };
+
+        const width = 1140;
+        const height = window.innerHeight * 0.8;
+
+        const treemap = d3.treemap()
+            .size([width, height])
+            .padding(1)
+            .round(true);
+
+        const root = d3.hierarchy(data)
+            .sum(d => d.constituents)
+            .sort((a, b) => b.constituents - a.constituents);
+
+        treemap(root);
+
+        const svg = d3.select("#treemap")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .style("font", "10px sans-serif");
+
+        const cell = svg.selectAll("g")
+            .data(root.leaves())
+            .enter().append("g")
+            .attr("transform", d => `translate(${d.x0},${d.y0})`);
+
+        const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+        function getFontSize(tileWidth, tileHeight) {
+            const minSize = Math.min(tileWidth, tileHeight);
+            return Math.max(10, Math.min(16, minSize * 0.15));
+        }
+
+        function wrapText(text, width) {
+            text.each(function() {
+                const text = d3.select(this),
+                    words = text.text().split(/\s+/).reverse(),
+                    lineHeight = 1.1;
+                let word,
+                    line = [],
+                    lineNumber = 0,
+                    y = text.attr("y"),
+                    dy = parseFloat(text.attr("dy")) || 0,
+                    tspan = text.text(null).append("tspan").attr("x", 3).attr("y", y).attr("dy", dy + "em");
+                while (word = words.pop()) {
+                    line.push(word);
+                    tspan.text(line.join(" "));
+                    if (tspan.node().getComputedTextLength() > width) {
+                        line.pop();
+                        tspan.text(line.join(" "));
+                        line = [word];
+                        tspan = text.append("tspan").attr("x", 3).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+                    }
+                }
+            });
+        }
+
+        cell.append("rect")
+            .attr("id", d => d.data.id)
+            .attr("width", d => d.x1 - d.x0)
+            .attr("height", d => d.y1 - d.y0)
+            .attr("fill", d => colorScale(d.data.index_id))
+            .attr("stroke", "#ffffff")
+            .on("click", d => {
+                window.location.href = `/index/${d.data.code}/`;
+            });
+
+        cell.append("foreignObject")
+            .attr("x", 3)
+            .attr("y", 3)
+            .attr("width", d => d.x1 - d.x0)
+            .attr("height", d => d.y1 - d.y0)
+            .append("xhtml:div")
+            .style("font-size", d => getFontSize(d.x1 - d.x0, d.y1 - d.y0) + "px")
+            .style("color", "#ffffff")
+            .style("overflow", "hidden")
+            .html(d => `<a href="/constituents/${d.data.index_id}/">${d.data.code}</a> (${d.data.constituents})`);
+    </script>
+</body>
+</html>
